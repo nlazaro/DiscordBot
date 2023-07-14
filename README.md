@@ -1,12 +1,6 @@
 # DiscordBot
 
-Using the ChatGPT API
+This bot uses OpenAI's API to generate responses to messages sent in Discord. It can be used to answer questions, generate creative text formats, and more. I have it hosted on Google Cloud.
 
-!!!
-
-to do:
-
-- add more exception checks
-- change to actual OOP format
-- add patterns
-- create logs
+The bot can do the following:
+- /Chat command that will send your message to chatGPT and reply back to you
