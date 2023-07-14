@@ -1,50 +1,59 @@
 import asyncio
-import os
 import discord
 import openai
-
 from discord.ext import commands
 from discord import app_commands
-from dotenv import load_dotenv
+from clientBot import client
 
-def main():
-    intents = discord.Intents.default()
-    intents.message_content = True
-    client = commands.Bot(command_prefix='!', intents=intents)
-
+def run_bot():
     @client.event
     async def on_ready():
-        try:
             synced = await client.tree.sync()
-            print(f"Synced {len(synced)} command(s)")
-            await client.change_presence(activity=discord.Game('Minecraft'))
-        except Exception as e:
-            print(e)
-
-    @client.tree.command(name="hello")
-    async def hello(interaction: discord.Interaction):
-        await interaction.response.send_message(f"Hey {interaction.user.mention}! This is a slash command!", ephemeral=True)
-
-    @client.tree.command(name="talk")
-    @app_commands.describe(message = "What should I say?")
-    async def talk(interaction: discord.Interaction, message: str):
-        userInfo = (f"{interaction.user.mention} asked: {message}. ChatNix replied: \n")
+            print(f"Synced {len(synced)} commands(s)")
+        
+    @client.tree.command(name="chat", description="Send a message to ChatGPT")
+    async def chat(interaction: discord.Interaction, message: str):
+        #   edge case to not reply towards itself
+        if interaction.user == client.user:
+            return
         await interaction.response.defer()
         await asyncio.sleep(delay=0)
+        userInfo = interaction.user.mention
         await interaction.followup.send(chatgpt_message(userInfo, message))
-        
-    client.run(DISCORD_TOKEN)
+    
+    client.run(client.discord_api_key)
 
-def chatgpt_message(userInfo:str, message: str):
-    openai.api_key = OPENAI_TOKEN
-    completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": message}])
-    response_message = userInfo
-    response_message += completion.choices[0].message.content
+def chatgpt_message(userInfo: str, message: str):
+    '''
+    Args:
+        userInfo: The user who sent the message
+        message: the message itself
+    Returns:
+        A reply from chatGPT, which may be a list of messages if the reply exceeds 2000 characters 
+    '''
+    openai.api_key = client.openai_api_key
+    response_message = (f"{userInfo} asked: {message} \n")
+
+    try:
+        completion = openai.ChatCompletion.create(
+             model="gpt-3.5-turbo", messages=[{"role": "user", "content": message}])
+    except Exception as e:
+         response_message += (f"\n`\n{e}\n`")
+         return response_message
+    
+    response_message += "``" + completion.choices[0].message.content + "``"
+    #if len(response_message) > 2000:
+     #    return split_message(response_message)
     return response_message
 
-
-if __name__ == "__main__":
-    load_dotenv()
-    DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
-    OPENAI_TOKEN = os.getenv('OPENAI_API_KEY')
-    main()
+def split_message(message: str):
+    #doesnt work lol
+    messages = []
+    message_count = 1
+    for message_part in message.split("\n"):
+        if len(messages[-1]) + len(message_part) + 1 > 2000:
+            messages.append(f"`\n{message_count}. {message}\n`")
+            message_count += 1
+        else:
+            messages[-1] += message_part + "\n"
+    return messages
